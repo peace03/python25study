@@ -21,3 +21,6 @@
 <파라미터>  
   - min_samples_split : 노드를 분할하기 위한 최소한의 샘플 데이터 수 (default = 2)  
   - min_samples_leaf  : 분할 후 왼쪽, 오른쪽 브랜치 노드에서 가져야할 최소한의 샘플 데이터 수
+
+---
+#k평균(mean)
