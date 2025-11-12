@@ -193,3 +193,157 @@ plt.legend(['Apple', 'Pineapple', 'Banana'])
 plt.title("Visualization of Clustering with 2 PCA Components")
 plt.show()
 ```
+---
+# 인공신경망
+인공신경망 Artificial Neural Network (ANN) : 사람의 뇌 신경 세포(뉴런)가 전기 신호를 주고받는 방식을 모방하여, 데이터의 복잡한 패턴을 스스로 학습하는 알고리즘
+
+<원리>
+1. 입력(Input): 들어온 데이터(x)에 중요도인 가중치(w)를 곱하고 편향(b)을 더해 신호의 총합(z)을 구합니다.
+2. 활성화(Activation): 합쳐진 신호를 활성화 함수(시그모이드, 렐루 등)에 통과시켜 다음 단계로 신호를 보낼지 결정합니다.
+3. 학습(Backpropagation): 예측값과 정답의 오차(손실)를 계산하고, 이를 줄이는 방향으로 가중치를 거꾸로 수정(역전파)하며 똑똑해집니다.
+
+<특징>
+- 장점
+  1. 이미지, 음성, 텍스트 등 규칙을 정의하기 힘든 복잡한 비정형 데이터 처리에 압도적인 성능을 보임
+- 단점
+  1. 내부 계산이 너무 복잡하여, 모델이 왜 이런 결론을 내렸는지 설명하기 어려운 '블랙박스'문제가 있다.
+  2. 제대로 된 성능을 내기 위해서는 아주 많은 양의 데이터와 긴 학습 시간(GPU)이 필요합니다.
+ 
+<코드>
+```python
+# ==========================================
+# 0. 환경 설정 및 라이브러리 임포트
+# ==========================================
+import tensorflow as tf
+from tensorflow import keras
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+
+# 실행 결과의 재현성을 위해 랜덤 시드 고정 (필수)
+tf.keras.utils.set_random_seed(42)
+tf.config.experimental.enable_op_determinism()
+
+print("TensorFlow version:", tf.__version__)
+
+# ==========================================
+# 1. 데이터 준비 (로드 및 전처리)
+# ==========================================
+print("\n--- 1. 데이터 준비 ---")
+
+# 패션 MNIST 데이터셋 로드 (훈련용 / 테스트용 자동 분할)
+(train_input, train_target), (test_input, test_target) = keras.datasets.fashion_mnist.load_data()
+
+# 데이터 크기 확인
+print(f"원본 훈련 데이터: {train_input.shape}, 타깃: {train_target.shape}")
+print(f"원본 테스트 데이터: {test_input.shape}, 타깃: {test_target.shape}")
+
+# [전처리 1] 정규화 (Normalization): 0~255 픽셀 값을 0~1 사이로 변환
+train_scaled = train_input / 255.0
+test_scaled = test_input / 255.0
+
+# [전처리 2] 평탄화 (Flattening): 2차원 이미지(28x28)를 1차원 배열(784)로 펼침
+# (DNN 모델 입력용. CNN 모델 사용 시에는 이 과정 생략 가능)
+train_scaled = train_scaled.reshape(-1, 28*28)
+test_scaled = test_scaled.reshape(-1, 28*28)
+
+print(f"전처리 후 훈련 데이터: {train_scaled.shape}") # (60000, 784)
+
+# [검증 세트 분리] 훈련 세트에서 20%를 떼어내어 검증(Validation) 세트로 만듦
+# 딥러닝은 데이터가 많아 교차 검증 대신 검증 세트를 사용함
+train_scaled, val_scaled, train_target, val_target = train_test_split(
+    train_scaled, train_target, test_size=0.2, random_state=42
+)
+print(f"최종 훈련 세트: {train_scaled.shape}, 검증 세트: {val_scaled.shape}")
+
+# ==========================================
+# 2. 모델 만들기 (인공신경망 정의)
+# ==========================================
+print("\n--- 2. 모델 생성 ---")
+
+# Dense 층 (밀집층/완전연결층) 정의
+# 10: 뉴런 개수 (타깃 클래스가 10개이므로)
+# activation='softmax': 다중 분류를 위한 활성화 함수 (이진 분류는 'sigmoid')
+# input_shape=(784,): 입력 데이터의 크기 (첫 번째 층에만 지정)
+dense = keras.layers.Dense(10, activation='softmax', input_shape=(784,))
+
+# Sequential 클래스로 모델 구성 (층을 순서대로 쌓음)
+model = keras.Sequential([dense])
+
+# 모델 구조 요약 출력 (파라미터 개수 등 확인)
+model.summary()
+
+# ==========================================
+# 3. 모델 설정 (Compile)
+# ==========================================
+print("\n--- 3. 모델 컴파일 ---")
+
+# compile(): 훈련 방법 설정
+# loss: 손실 함수
+#   - 'sparse_categorical_crossentropy': 타깃이 정수(0, 1, 2...)인 다중 분류
+#   - 'categorical_crossentropy': 타깃이 원-핫 인코딩된 다중 분류
+#   - 'binary_crossentropy': 이진 분류
+# metrics: 훈련 도중 모니터링할 지표 (정확도 등)
+model.compile(loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+
+# ==========================================
+# 4. 모델 훈련 (Fit)
+# ==========================================
+print("\n--- 4. 모델 훈련 ---")
+
+# fit(): 실제 학습 진행
+# epochs: 전체 데이터를 몇 번 반복해서 학습할지 설정
+# validation_data: 검증 세트를 전달하여 에포크마다 검증 점수도 함께 확인 가능 (선택)
+history = model.fit(train_scaled, train_target, epochs=5, validation_data=(val_scaled, val_target))
+
+# ==========================================
+# 5. 모델 평가 (Evaluate)
+# ==========================================
+print("\n--- 5. 모델 평가 ---")
+
+# evaluate(): 검증 세트(또는 테스트 세트)로 최종 성능 확인
+# 반환값: [손실(loss), 정확도(accuracy)]
+loss, accuracy = model.evaluate(val_scaled, val_target)
+print(f"검증 세트 손실: {loss:.4f}")
+print(f"검증 세트 정확도: {accuracy:.4f}")
+
+# ==========================================
+# [부록] 예측 및 시각화 (활용 예시)
+# ==========================================
+print("\n--- [부록] 예측 결과 확인 ---")
+
+# 훈련된 모델로 예측 수행 (검증 데이터 앞 10개)
+# predict(): 각 클래스별 확률을 반환함
+predictions = model.predict(val_scaled[:10])
+print(f"예측 확률 모양: {predictions.shape}") # (10, 10)
+
+# 가장 높은 확률을 가진 클래스 인덱스 찾기 (argmax)
+predicted_classes = np.argmax(predictions, axis=-1)
+print(f"예측된 클래스: {predicted_classes}")
+print(f"실제 정답:     {val_target[:10]}")
+
+# 손실과 정확도 그래프 그리기 (history 객체 활용)
+plt.figure(figsize=(12, 4))
+
+# 1. 손실(Loss) 그래프
+plt.subplot(1, 2, 1)
+plt.plot(history.history['loss'], label='Train Loss')
+plt.plot(history.history['val_loss'], label='Val Loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+plt.title('Loss Curve')
+
+# 2. 정확도(Accuracy) 그래프
+plt.subplot(1, 2, 2)
+plt.plot(history.history['accuracy'], label='Train Accuracy')
+plt.plot(history.history['val_accuracy'], label='Val Accuracy')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.title('Accuracy Curve')
+
+plt.show()
+```
+---
+# 심층신경망
