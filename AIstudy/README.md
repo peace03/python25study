@@ -50,6 +50,7 @@ from sklearn.cluster import KMeans
 km = KMeans(n_clusters=3, random_state=42)
 km.fit(data)
 km.labels_ #군집 결과
+km.transform(data) #샘플에서 클러스터 중심까지의 거리로 변환
 
 #그림 출력
 import matplotlib.pyplot as plt
