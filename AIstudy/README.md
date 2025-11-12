@@ -51,6 +51,7 @@ km = KMeans(n_clusters=3, random_state=42)
 km.fit(data)
 km.labels_ #군집 결과
 km.transform(data) #샘플에서 클러스터 중심까지의 거리로 변환
+km.n_iter_ #몇번 클러스터 중심을 옮기면서 최적의 클러스터를 찾았는지?
 
 #그림 출력
 import matplotlib.pyplot as plt
