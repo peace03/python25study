@@ -53,6 +53,6 @@ km.labels_ #군집 결과
 
 #그림 출력
 import matplotlib.pyplot as plt
-fig, axs = plt.subplots(rows, cols, figsize=(10*10), squeeze=False)
+fig, axs = plt.subplots(rows, cols, figsize=(cols*ratio, rows*ratio), squeeze=False)
 axs[0].imshow(data[:], cmap='gray_r')
 ```
