@@ -347,3 +347,153 @@ plt.show()
 ```
 ---
 # 심층신경망
+심층신경망 Deep Neural Network (DNN) : 인공신경망의 입력층과 출력층 사이에 있는 은닉층(Hidden Layer)을 2개 이상 깊게 쌓아 올려, 데이터의 더 복잡하고 추상적인 특징을 단계별로 학습하는 알고리즘
+
+<원리>
+1. 심층구조(Deep Architecture): 층이 하나뿐인 기존 신경망과 달리, 수십~수백개의 층을 깊게 배치하여 데이터를 훨씬 더 정교하고 세밀하게 분해합니다.
+2. 표현학습(Representation Learning): 앝은 층에서는 선이나 점 같은 단순한 특징을 찾고, 깊은 층으로 갈수록 이를 조합해 눈,코,입 같은 복잡한 개념을 스스로 이해합니다.
+3. 최적화(Optimization): 층이 너무 깊어지면 학습이 안되는 문제(기울기 소실)을 렐루(ReLU), 드롭아웃(Dropout) 등의 기법으로 해결하여 깊은 망까지 신호가 잘 전달되게 합니다.
+
+<특징>
+- 장점
+  1. 데이터의 양이 많아질수록 성능이 정체되지 않고 계속 좋아짐.
+  2. 사람 수준의 인지 능력 구현 가능
+- 단점
+  1. 학습해야할 파라미터(가중치)가 수백만개 이상이므로, 고성능 GPU와 방대한 데이터가 필요
+  2. 훈련 데이터의 노이즈까지 너무 상세하게 외워버리는 과대적합(Overfitting)이 발생하기 쉬워 정교한 규제 기술이 필수
+ 
+<코드>
+```python
+# ==========================================
+# 0. 환경 설정 및 라이브러리 임포트
+# ==========================================
+import tensorflow as tf
+from tensorflow import keras
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+
+# 실행 결과의 재현성을 위해 랜덤 시드 고정 (필수)
+tf.keras.utils.set_random_seed(42)
+tf.config.experimental.enable_op_determinism()
+
+print(f"TensorFlow version: {tf.__version__}")
+
+# ==========================================
+# 1. 데이터 준비 (로드 및 전처리)
+# ==========================================
+print("\n--- 1. 데이터 준비 ---")
+
+# 패션 MNIST 데이터셋 로드
+(train_input, train_target), (test_input, test_target) = keras.datasets.fashion_mnist.load_data()
+
+# 정규화 (0~255 -> 0~1)
+# DNN은 픽셀 값이 0~1 사이일 때 학습이 가장 잘 됨
+train_scaled = train_input / 255.0
+test_scaled = test_input / 255.0
+
+# 데이터 크기 확인
+print(f"전처리 전 훈련 데이터: {train_scaled.shape}")
+
+# 검증 세트 분리 (20%)
+train_scaled, val_scaled, train_target, val_target = train_test_split(
+    train_scaled, train_target, test_size=0.2, random_state=42
+)
+print(f"최종 훈련 세트: {train_scaled.shape}, 검증 세트: {val_scaled.shape}")
+
+# ==========================================
+# 2. 심층 신경망 (DNN) 모델 생성 함수
+# ==========================================
+def create_dnn_model():
+    """
+    은닉층이 포함된 심층 신경망 모델을 생성하여 반환하는 함수
+    구조: Flatten -> Dense(ReLU) -> Dense(Softmax)
+    """
+    model = keras.Sequential(name='Fashion_MNIST_DNN')
+    
+    # [입력층] Flatten: 2차원 이미지(28x28)를 1차원(784)으로 펼침
+    # 파라미터가 없는 층이지만 입력값의 차원을 변환해줌
+    model.add(keras.layers.Flatten(input_shape=(28, 28)))
+    
+    # [은닉층] Dense: 100개의 뉴런, 활성화 함수는 ReLU
+    # ReLU: 시그모이드의 단점(기울기 소실)을 해결하여 심층 신경망 학습에 유리함
+    # 이미지 처리에서 특히 좋은 성능을 보임
+    model.add(keras.layers.Dense(100, activation='relu', name='hidden'))
+    
+    # [출력층] Dense: 10개의 클래스 분류, 활성화 함수는 Softmax
+    # 다중 분류 문제이므로 softmax 사용 (이진 분류라면 sigmoid)
+    model.add(keras.layers.Dense(10, activation='softmax', name='output'))
+    
+    return model
+
+# 모델 구조 확인
+model_test = create_dnn_model()
+model_test.summary()
+
+# ==========================================
+# 3. 다양한 옵티마이저(Optimizer) 비교 학습
+# ==========================================
+print("\n--- 3. 옵티마이저별 성능 비교 ---")
+
+# 테스트할 옵티마이저 목록 (이름 문자열 또는 객체)
+# 1. sgd: 기본 확률적 경사 하강법
+# 2. adagrad: 적응적 학습률 (많이 변한 파라미터는 학습률을 낮춤)
+# 3. rmsprop: 적응적 학습률 (최근 기울기를 더 반영, 케라스의 RNN 기본값)
+# 4. adam: 모멘텀(관성) + RMSprop의 장점을 합친 알고리즘 (가장 널리 쓰임 ⭐️)
+
+optimizers = ['sgd', 'adagrad', 'rmsprop', 'adam']
+history_dict = {}
+
+for opt_name in optimizers:
+    print(f"\n[Optimizer: {opt_name.upper()}] 훈련 시작...")
+    
+    # 매번 새로운 모델 생성 (가중치 초기화)
+    model = create_dnn_model()
+    
+    # 모델 컴파일
+    # optimizer: 문자열로 지정하면 기본 설정값으로 객체가 자동 생성됨
+    model.compile(loss='sparse_categorical_crossentropy', 
+                  metrics=['accuracy'], 
+                  optimizer=opt_name)
+    
+    # 모델 훈련
+    history = model.fit(train_scaled, train_target, epochs=5, verbose=0) # verbose=0: 로그 숨김
+    
+    # 검증 세트 평가
+    val_loss, val_acc = model.evaluate(val_scaled, val_target, verbose=0)
+    print(f" -> 검증 정확도: {val_acc:.4f}")
+    
+    # 결과 저장
+    history_dict[opt_name] = history
+
+# ==========================================
+# 4. 학습 결과 시각화 비교
+# ==========================================
+print("\n--- 4. 학습 곡선 시각화 ---")
+
+plt.figure(figsize=(10, 6))
+
+for opt_name, history in history_dict.items():
+    plt.plot(history.history['loss'], label=f'{opt_name}')
+
+plt.xlabel('Epochs')
+plt.ylabel('Training Loss')
+plt.title('Optimizer Comparison (Loss)')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# ==========================================
+# 5. (심화) 옵티마이저 세부 설정 예시
+# ==========================================
+# 문자열('adam') 대신 객체를 직접 생성하면 학습률(learning_rate) 등 세부 조정 가능
+
+# 예: SGD에 모멘텀(관성) 적용 및 네스테로프 가속 경사 사용
+sgd_custom = keras.optimizers.SGD(learning_rate=0.1, momentum=0.9, nesterov=True)
+
+# 예: Adam의 학습률 조정
+adam_custom = keras.optimizers.Adam(learning_rate=0.001) # 기본값
+
+# 적용 방법
+# model.compile(optimizer=adam_custom, ...)
+```
