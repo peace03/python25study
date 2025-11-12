@@ -79,8 +79,8 @@ axs[0].imshow(data[:], cmap='gray_r')
   2. 해석의 어려움
   3. 분류 정보 손실 가능성
  
-  <코드>
-  ```python
+<코드>
+```python
 # ==========================================
 # 0. 라이브러리 임포트 및 데이터 준비
 # ==========================================
@@ -192,4 +192,4 @@ for label in range(0, 3):
 plt.legend(['Apple', 'Pineapple', 'Banana'])
 plt.title("Visualization of Clustering with 2 PCA Components")
 plt.show()
-  ```
+```
