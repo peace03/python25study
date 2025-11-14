@@ -547,5 +547,112 @@ adam_custom = keras.optimizers.Adam(learning_rate=0.001) # 기본값
    
 <코드>
 ```python
+# ==========================================
+# 1. 환경 설정 및 데이터 준비
+# ==========================================
+import tensorflow as tf
+from tensorflow import keras
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+import numpy as np
 
+# [필수] 재현성을 위한 랜덤 시드 고정
+tf.keras.utils.set_random_seed(42)
+tf.config.experimental.enable_op_determinism()
+
+# 데이터 로드 (패션 MNIST)
+(train_input, train_target), (test_input, test_target) = keras.datasets.fashion_mnist.load_data()
+
+# 전처리: 정규화 (0~255 -> 0~1)
+train_scaled = train_input / 255.0
+test_scaled = test_input / 255.0
+
+# 검증 세트 분리 (20%)
+train_scaled, val_scaled, train_target, val_target = train_test_split(
+    train_scaled, train_target, test_size=0.2, random_state=42
+)
+
+# ==========================================
+# 2. 모델 생성 함수 (드롭아웃 적용)
+# ==========================================
+def create_model(dropout_rate=0.3):
+    """
+    드롭아웃 층이 포함된 심층 신경망 모델을 생성합니다.
+    :param dropout_rate: 드롭아웃 비율 (기본값 0.3 = 30% 뉴런 비활성화)
+    """
+    model = keras.Sequential(name='Dropout_Model')
+    
+    # 1. 입력층 (Flatten)
+    model.add(keras.layers.Flatten(input_shape=(28, 28)))
+    
+    # 2. 은닉층 (Dense + ReLU)
+    model.add(keras.layers.Dense(100, activation='relu'))
+    
+    # 3. [핵심] 드롭아웃 층 (규제)
+    # 은닉층 바로 뒤에 배치하여 과대적합을 막습니다.
+    model.add(keras.layers.Dropout(dropout_rate))
+    
+    # 4. 출력층 (Dense + Softmax)
+    model.add(keras.layers.Dense(10, activation='softmax'))
+    
+    return model
+
+# 모델 생성 및 요약
+model = create_model(dropout_rate=0.3)
+model.summary()
+
+# ==========================================
+# 3. 콜백(Callback) 정의 (저장 및 조기종료)
+# ==========================================
+
+# [콜백 1] ModelCheckpoint: 최상의 모델 자동 저장
+# - save_best_only=True: 성능이 좋아졌을 때만 덮어씀 (용량 절약)
+# - file_path: 저장할 파일명 (.keras 권장)
+checkpoint_cb = keras.callbacks.ModelCheckpoint(
+    'best-model.keras', 
+    save_best_only=True
+)
+
+# [콜백 2] EarlyStopping: 조기 종료
+# - patience=2: 검증 점수가 안 좋아져도 2번(에포크)까지는 기다려줌
+# - restore_best_weights=True: 종료 후, 가장 점수가 좋았던 시절의 가중치로 되돌려놓음 (필수!)
+early_stopping_cb = keras.callbacks.EarlyStopping(
+    patience=2, 
+    restore_best_weights=True
+)
+
+# ==========================================
+# 4. 모델 컴파일 및 훈련
+# ==========================================
+model.compile(optimizer='adam', 
+              loss='sparse_categorical_crossentropy', 
+              metrics=['accuracy'])
+
+# 훈련 시작 (callbacks 리스트에 위에서 만든 콜백 객체들을 넣음)
+print("\n----------- 훈련 시작 -----------")
+history = model.fit(
+    train_scaled, train_target,
+    epochs=50,  # 조기종료가 있으므로 에포크를 넉넉하게 줘도 됨
+    verbose=1,
+    validation_data=(val_scaled, val_target),
+    callbacks=[checkpoint_cb, early_stopping_cb] # <--- 핵심!
+)
+
+# ==========================================
+# 5. 결과 확인 및 시각화
+# ==========================================
+print(f"\n조기 종료된 에포크: {early_stopping_cb.stopped_epoch} 번째")
+
+# 손실 곡선 그리기
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.xlabel('epoch')
+plt.ylabel('loss')
+plt.legend(['train', 'val'])
+plt.title('Training and Validation Loss')
+plt.show()
+
+# 최종 성능 평가 (EarlyStopping 덕분에 최적의 모델 상태임)
+print("\n----------- 최종 검증 세트 평가 -----------")
+model.evaluate(val_scaled, val_target)
 ```
